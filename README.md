@@ -1,178 +1,150 @@
-# Lane-Detection-and-Steering-Angle-Estimation
+# Lane Detection and Steering Angle Estimation (U-Net + Kalman Filter)
 
-This project implements a **vision-based lane detection and steering angle estimation system** using **deep learning (U-Net)** and **Kalman Filter–based sensor fusion**.  
-It is designed as an academic autonomous vehicle perception and control pipeline.
-
----
-
-## 📌 Project Overview
-
-Lane detection is a core component of autonomous driving.  
-Traditional computer vision methods (edge detection, thresholding) are highly sensitive to:
-
-- Lighting variations  
-- Shadows and reflections  
-- Complex road textures  
-
-This project uses **deep learning–based semantic segmentation** to robustly extract lane regions and estimate **lane curvature and steering angle**.
+Vision-based lane segmentation and steering angle estimation using a **custom U-Net (trained from scratch)** and **Kalman filter smoothing**.  
+Designed for an academic autonomous vehicle perception → estimation → control pipeline.
 
 ---
 
-## 🎯 Objectives
-
-- Perform **lane segmentation** using a custom U-Net CNN
-- Extract lane boundaries from segmentation masks
-- Estimate **steering angle** from lane curvature
-- Apply **Kalman Filter** for noise reduction and smoothing
-- Demonstrate a full **perception → estimation → control** pipeline
+## Key Features
+- **Binary lane segmentation** (lane vs background) using a lightweight U-Net
+- **Steering angle estimation** from lane boundary curvature (2nd-order polynomial fit)
+- **Kalman filter (2D state: angle + angular rate)** for temporal smoothing
+- Supports **stereo calibration rectification** (left/right alignment)  
+  > Lane mask is computed from the **rectified LEFT** frame (right frame is for alignment/depth extension)
 
 ---
 
-## 🧠 System Pipeline
+## Learning Outcomes Coverage (LO1–LO3)
+- **LO1 (Comprehension):** explains core CV methods (segmentation, camera calibration, stereo geometry) and filtering (Kalman)
+- **LO2 (Application):** implements a working lane segmentation + steering estimation pipeline
+- **LO3 (Communication/Teamwork):** clear documentation, modular code, results + evaluation metrics
 
-```text
-Stereo Camera
-     ↓
-Image Preprocessing
-     ↓
-U-Net Lane Segmentation
-     ↓
-Lane Mask
-     ↓
-Boundary Extraction
-     ↓
-Curve Fitting (2nd order polynomial)
-     ↓
-Steering Angle Estimation
-     ↓
-Kalman Filter
-     ↓
-Smoothed Steering Angle Output
+---
+
+## Project Pipeline (High Level)
+
+Stereo Camera → Rectification → (Left Frame) U-Net Segmentation → Binary Mask  
+→ Boundary Extraction → Polynomial Curve Fit → Raw Angle  
+→ Kalman Filter → Smoothed Steering Angle → (Optional) Voltage Mapping
+
+---
+
+## Folder Structure (Recommended)
+
+Lane-Detection-and-Steering-Angle-Estimation/
+├── README.md
+├── LICENSE
+├── .gitignore
+├── requirements.txt
+│
+├── src/
+│   ├── train_unet.py
+│   ├── evaluate_metrics.py
+│   ├── inference_single_image.py
+│   ├── stereo_rectify_and_steer.py
+│   └── utils/
+│       ├── data_loader.py
+│       ├── unet_model.py
+│       ├── geometry.py
+│       └── kalman.py
+│
+├── notebooks/
+│   ├── comvis_training.ipynb
+│   └── sfv_stereo_steering.ipynb
+│
+├── models/
+│   └── lane_model.h5              # trained model (optional to upload, see notes)
+│
+├── calibration/
+│   └── stereo_calibration.npz     # stereo parameters (K, D, R, T)
+│
+├── data/                          # (DO NOT UPLOAD FULL DATASET)
+│   └── README_DATA.md             # instructions to place dataset locally
+│
+└── results/
+    ├── loss_accuracy.png
+    ├── prediction_grid.png
+    ├── confusion_matrix.png
+    └── confusion_matrix_norm.png
+
+> NOTE: Put large datasets in `data/` but keep them **ignored** by git.
+
+---
+
+## Dataset
+- Source: **Roboflow lane segmentation dataset** (image + mask pairs)
+- Input: RGB road images
+- Ground truth: binary masks
+  - `1` = lane/drivable region  
+  - `0` = background
+
+---
+
+## Preprocessing
+- Resize images and masks to **256×256**
+  - makes training faster + consistent input size for CNN
+- Normalize image pixels to **[0, 1]**
+- Convert masks to **binary**
+- Build `tf.data` pipeline: shuffle → batch → prefetch
+
+---
+
+## Model Architecture (Custom U-Net, Trained From Scratch)
+This project uses a **simplified U-Net**:
+- Encoder: Conv(32) → Conv(32) → MaxPool  
+  Conv(64) → Conv(64) → MaxPool  
+  Conv(128) → Conv(128) → MaxPool
+- Bottleneck: Conv(256) → Conv(256)
+- Decoder: UpSample + Skip Connections + Conv blocks
+- Output: **1 channel + Sigmoid activation** (binary segmentation)
+
+**What’s different from “ordinary U-Net”?**
+- Lighter (fewer stages than full U-Net variants)
+- No pretrained backbone (trained from scratch)
+- Output is **binary** (1 channel) instead of multi-class
+
+---
+
+## Training Setup
+- Epochs: 75
+- Batch size: 2 (GPU memory constraint)
+- Loss: Binary Cross Entropy
+- Optimizer: Adam (1e-3)
+- Metrics: Accuracy, Precision, Recall
+
+---
+
+## Evaluation Metrics
+- Pixel Accuracy
+- Precision / Recall / F1
+- IoU (Lane)
+- Dice (Lane)
+- Confusion Matrix (pixel-level)
+
+---
+
+## How To Run
+
+### 1) Create Environment & Install
+```bash
+conda create -n raviole python=3.10 -y
+conda activate raviole
+pip install -r requirements.txt
+```
+### 2) Train (U-Net)
+```bash
+python src/train_unet.py --data_dir lane_detection --img_size 256 --epochs 75 --batch 2
+```
+### 3) Evaluate (Confusion Matrix + IoU/Dice)
+```bash
+python src/evaluate_metrics.py --model models/lane_model.h5 --val_dir lane_detection/valid
+```
+### 4) Stereo Rectification + Steering (Live)
+```bash
+python src/stereo_rectify_and_steer.py --model models/lane_model.h5 --calib calibration/stereo_calibration.npz
 ```
 
-📊 Dataset
-
-- Source: Roboflow
-
-  - Data Type: Image–Mask pairs
-
-  - Image: RGB road images
-
-- Mask:
-
-  - White (1): Lane / drivable area
-
-  - Black (0): Background
-
-- Preprocessing
-
-  - Resize to 256 × 256
-
-  - Normalize pixel values to [0, 1]
-
-  - Masks converted to binary format
-
-🏗️ Model Architecture
-
-1. Base Model: Modified U-Net
-
-2. Encoder–Decoder CNN
-
-3. Skip connections preserve lane boundaries
-
-4. Lightweight architecture for faster inference
-
-5. Trained from scratch (no pretrained weights)
-
-- Key Details
-
-  - Output channels: 1 (binary segmentation)
-
-  - Activation: Sigmoid
-
-  - Loss: Binary Cross-Entropy
-
-  - Optimizer: Adam
-
-🏋️ Training Configuration
-
-- Epochs: 75
-
-- Batch size: 2 (GPU memory limitation)
-
-- Metrics:
-
-  1. Accuracy
-
-  2. Precision
-
-  3. Recall
-
-  4. Training Results
-
-      - Accuracy > 99%
-
-      - Stable validation loss
-
-      - No significant overfitting
-
-📐 Steering Angle Estimation
-
-Steps:
-
-1. Extract lane boundaries from mask
-
-2. Fit 2nd-order polynomial
-
-3. Compute tangent angle relative to vehicle
-
-4. Apply Kalman Filter for smoothing
-
-5. Kalman Filter
-
-  - Reduces noise between frames
-
-  - Produces stable steering commands
-
-Output can be mapped to:
-
-- Steering angle (degrees)
-
-- Steering voltage (MCU / EPS)
-
-⚙️ Hardware Integration (Concept)
-
-- Stereo Camera (Left–Right)
-
-- Microcontroller: ESP32
-
-- Actuator: Stepper Motor (NEMA 23) + TB6600 driver
-
-- Control output: PWM steering signal
-
-⚠️ Limitations
-
-- No explicit data augmentation
-
-- Binary segmentation only (no left/right lane separation)
-
-- Performance drops on wet roads due to reflections
-
-- EPS control not fully synchronized
-
-🚀 Future Work
-
-- Add data augmentation (brightness, blur, shadows)
-
-- Multi-class lane segmentation
-
-- Real-time optimization
-
-- Full closed-loop EPS control
-
-- Better stereo depth utilization
-
-👨‍💻 Authors
+Authors
 
 1. Alvito Danendra Putra
 
