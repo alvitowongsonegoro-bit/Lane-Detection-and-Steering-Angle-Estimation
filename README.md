@@ -48,7 +48,7 @@ Steering Angle Estimation
 Kalman Filter
      ↓
 Smoothed Steering Angle Output
-
+```
 
 📊 Dataset
 
@@ -110,11 +110,11 @@ Smoothed Steering Angle Output
 
   4. Training Results
 
-    - Accuracy > 99%
+      - Accuracy > 99%
 
-    - Stable validation loss
+      - Stable validation loss
 
-    - No significant overfitting
+      - No significant overfitting
 
 📐 Steering Angle Estimation
 
