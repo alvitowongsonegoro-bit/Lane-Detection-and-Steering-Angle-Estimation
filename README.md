@@ -49,39 +49,6 @@ Kalman Filter
      ↓
 Smoothed Steering Angle Output
 
-Lane-Detection-and-Steering-Angle-Estimation/
-│
-├── data/
-│   ├── train/
-│   │   ├── images/
-│   │   └── masks/
-│   ├── val/
-│   │   ├── images/
-│   │   └── masks/
-│
-├── models/
-│   └── unet_lane_segmentation.h5
-│
-├── notebooks/
-│   ├── 01_data_preprocessing.ipynb
-│   ├── 02_unet_training.ipynb
-│   ├── 03_lane_inference.ipynb
-│   └── 04_steering_angle_kalman.ipynb
-│
-├── src/
-│   ├── preprocessing.py
-│   ├── unet_model.py
-│   ├── lane_extraction.py
-│   ├── steering_angle.py
-│   └── kalman_filter.py
-│
-├── results/
-│   ├── segmentation_examples/
-│   └── steering_angle_plots/
-│
-├── requirements.txt
-├── README.md
-└── .gitignore
 
 📊 Dataset
 
